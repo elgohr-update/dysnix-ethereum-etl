@@ -1,0 +1,44 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - -c
+      - docker pull gcr.io/$PROJECT_ID/${_image}:latest || exit 0
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -t
+      - gcr.io/$PROJECT_ID/${_image}:$TAG_NAME
+      - -t
+      - gcr.io/$PROJECT_ID/${_image}:latest
+
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - set
+      - image
+      - deployment
+      - ${_deployment0}
+      - stream=gcr.io/$PROJECT_ID/${_image}:$TAG_NAME
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_region}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_cluster_name}
+
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - set
+      - image
+      - deployment
+      - ${_deployment1}
+      - stream=gcr.io/$PROJECT_ID/${_image}:$TAG_NAME
+
+substitutions:
+ _image: ethereum-etl
+ _deployment0: ethereum-block-data-streaming-app-deployment
+ _deployment1: ethereum-trace-data-streaming-app-deployment
+ _region: us-central1
+ _cluster_name: baas0
+
+images:
+  - gcr.io/$PROJECT_ID/${_image}:$TAG_NAME
+  - gcr.io/$PROJECT_ID/${_image}:latest
