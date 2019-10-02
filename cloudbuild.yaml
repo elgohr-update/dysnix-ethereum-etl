@@ -3,42 +3,54 @@ steps:
     entrypoint: 'bash'
     args:
       - -c
-      - docker pull gcr.io/$PROJECT_ID/${_image}:latest || exit 0
+      - docker pull gcr.io/$PROJECT_ID/${_IMAGE}:latest || exit 0
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - build
       - -t
-      - gcr.io/$PROJECT_ID/${_image}:$TAG_NAME
+      - gcr.io/$PROJECT_ID/${_IMAGE}:$TAG_NAME
       - -t
-      - gcr.io/$PROJECT_ID/${_image}:latest
+      - gcr.io/$PROJECT_ID/${_IMAGE}:latest
+      - .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - gcr.io/$PROJECT_ID/${_IMAGE}:$TAG_NAME
 
   - name: 'gcr.io/cloud-builders/kubectl'
     args:
+      - --namespace=${_K8S_NS}
       - set
       - image
       - deployment
-      - ${_deployment0}
-      - stream=gcr.io/$PROJECT_ID/${_image}:$TAG_NAME
+      - ${_DEPLOYMENT0}
+      - stream=gcr.io/$PROJECT_ID/${_IMAGE}:$TAG_NAME
     env:
-      - CLOUDSDK_COMPUTE_REGION=${_region}
-      - CLOUDSDK_CONTAINER_CLUSTER=${_cluster_name}
+      - CLOUDSDK_COMPUTE_ZONE=${_ZONE}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}
 
   - name: 'gcr.io/cloud-builders/kubectl'
     args:
+      - --namespace=${_K8S_NS}
       - set
       - image
       - deployment
-      - ${_deployment1}
-      - stream=gcr.io/$PROJECT_ID/${_image}:$TAG_NAME
+      - ${_DEPLOYMENT1}
+      - stream=gcr.io/$PROJECT_ID/${_IMAGE}:$TAG_NAME
+    env:
+      - CLOUDSDK_COMPUTE_ZONE=${_ZONE}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}
 
 substitutions:
- _image: ethereum-etl
- _deployment0: ethereum-block-data-streaming-app-deployment
- _deployment1: ethereum-trace-data-streaming-app-deployment
- _region: us-central1
- _cluster_name: baas0
+ _IMAGE: ethereum-etl
+ _DEPLOYMENT0: ethereum-block-data-streaming-app-deployment
+ _DEPLOYMENT1: ethereum-trace-data-streaming-app-deployment
+ _ZONE: us-central1-b
+ _CLUSTER_NAME: baas0
+ _K8S_NS: dev-etl-0
 
 images:
-  - gcr.io/$PROJECT_ID/${_image}:$TAG_NAME
-  - gcr.io/$PROJECT_ID/${_image}:latest
+  - gcr.io/$PROJECT_ID/${_IMAGE}:$TAG_NAME
+  - gcr.io/$PROJECT_ID/${_IMAGE}:latest
