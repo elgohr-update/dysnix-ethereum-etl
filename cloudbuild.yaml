@@ -3,54 +3,42 @@ steps:
     entrypoint: 'bash'
     args:
       - -c
-      - docker pull gcr.io/$PROJECT_ID/${_IMAGE}:latest || exit 0
+      - docker pull ${_REGISTRY}/$PROJECT_ID/${_ENV}/${_IMAGE}:latest || exit 0
+    id: 'cache warm-up'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - build
       - -t
-      - gcr.io/$PROJECT_ID/${_IMAGE}:$SHORT_SHA
+      - ${_REGISTRY}/$PROJECT_ID/${_ENV}/${_IMAGE}:$SHORT_SHA
       - -t
-      - gcr.io/$PROJECT_ID/${_IMAGE}:latest
+      - ${_REGISTRY}/$PROJECT_ID/${_ENV}/${_IMAGE}:latest
+      - --cache-from
+      - ${_REGISTRY}/$PROJECT_ID/${_ENV}/${_IMAGE}:latest
       - .
+    id: 'build'
 
   - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
     args:
-      - push
-      - gcr.io/$PROJECT_ID/${_IMAGE}:$SHORT_SHA
-
-  - name: 'gcr.io/cloud-builders/kubectl'
-    args:
-      - --namespace=${_K8S_NS}
-      - set
-      - image
-      - deployment
-      - ${_DEPLOYMENT0}
-      - stream=gcr.io/$PROJECT_ID/${_IMAGE}:$SHORT_SHA
-    env:
-      - CLOUDSDK_COMPUTE_ZONE=${_ZONE}
-      - CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}
-
-  - name: 'gcr.io/cloud-builders/kubectl'
-    args:
-      - --namespace=${_K8S_NS}
-      - set
-      - image
-      - deployment
-      - ${_DEPLOYMENT1}
-      - stream=gcr.io/$PROJECT_ID/${_IMAGE}:$SHORT_SHA
-    env:
-      - CLOUDSDK_COMPUTE_ZONE=${_ZONE}
-      - CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}
+      - -c
+      - echo $SHORT_SHA > ${_IMAGE}
+    id: 'prepare artifacts'
+    waitFor:
+      - '-'
 
 substitutions:
  _IMAGE: ethereum-etl
- _DEPLOYMENT0: ethereum-block-data-streaming-app-deployment
- _DEPLOYMENT1: ethereum-trace-data-streaming-app-deployment
- _ZONE: us-central1-b
- _CLUSTER_NAME: baas0
- _K8S_NS: dev-etl-0
+ _REGISTRY: gcr.io
+ _ENV: dev
 
 images:
-  - gcr.io/$PROJECT_ID/${_IMAGE}:$SHORT_SHA
-  - gcr.io/$PROJECT_ID/${_IMAGE}:latest
+  - ${_REGISTRY}/$PROJECT_ID/${_ENV}/${_IMAGE}:$SHORT_SHA
+  - ${_REGISTRY}/$PROJECT_ID/${_ENV}/${_IMAGE}:latest
+
+artifacts:
+  objects:
+    location: gs://artifacts-${PROJECT_ID}/tags/${_ENV}/
+    paths:
+      - ${_IMAGE}
+
