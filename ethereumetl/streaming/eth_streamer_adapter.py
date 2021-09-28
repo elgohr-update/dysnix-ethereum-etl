@@ -15,6 +15,7 @@ from ethereumetl.streaming.eth_item_id_calculator import EthItemIdCalculator
 from ethereumetl.streaming.eth_item_timestamp_calculator import EthItemTimestampCalculator
 from ethereumetl.thread_local_proxy import ThreadLocalProxy
 from web3 import Web3
+from web3.middleware import geth_poa_middleware
 
 
 class EthStreamerAdapter:
@@ -24,7 +25,9 @@ class EthStreamerAdapter:
             item_exporter=ConsoleItemExporter(),
             batch_size=100,
             max_workers=5,
-            entity_types=tuple(EntityType.ALL_FOR_STREAMING)):
+            entity_types=tuple(EntityType.ALL_FOR_STREAMING),
+            is_poa=False):
+        self.is_poa = is_poa
         self.batch_web3_provider = batch_web3_provider
         self.item_exporter = item_exporter
         self.batch_size = batch_size
@@ -37,7 +40,10 @@ class EthStreamerAdapter:
         self.item_exporter.open()
 
     def get_current_block_number(self):
-        return int(Web3(self.batch_web3_provider).eth.getBlock("latest").number)
+        web3 = Web3(self.batch_web3_provider)
+        if self.is_poa:
+            web3.middleware_stack.inject(geth_poa_middleware, layer=0)
+        return int(web3.eth.getBlock("latest").number)
 
     def export_all(self, start_block, end_block):
         # Export blocks and transactions
@@ -88,12 +94,12 @@ class EthStreamerAdapter:
         logging.info('Exporting with ' + type(self.item_exporter).__name__)
 
         all_items = enriched_blocks + \
-            enriched_transactions + \
-            enriched_logs + \
-            enriched_token_transfers + \
-            enriched_traces + \
-            enriched_contracts + \
-            enriched_tokens
+                    enriched_transactions + \
+                    enriched_logs + \
+                    enriched_token_transfers + \
+                    enriched_traces + \
+                    enriched_contracts + \
+                    enriched_tokens
 
         self.calculate_item_ids(all_items)
         self.calculate_item_timestamps(all_items)
